@@ -1,0 +1,2 @@
+class NotValidityURL(Exception):
+    pass
