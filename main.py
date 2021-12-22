@@ -3,6 +3,7 @@ import vk_api
 import sqlite3
 from vk_api.bot_longpoll import VkBotLongPoll
 from vk_api.bot_longpoll import VkBotEventType
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.utils import get_random_id
 
 from exception import *
@@ -44,8 +45,11 @@ db_worker = DbWorker()
 @check_validity_url
 def command_writen(event, url):
     time_left = int(time.time() + 60 * 60 * 24)
+    user_id_hide = event.object.from_id
+    if list(db_worker.execute_query(f'SELECT * FROM HideUserProfile WHERE user_id = {event.object.from_id}')):
+        user_id_hide = -event.object.from_id
     sql_query = f"""INSERT INTO UserCheating(user_id, site_url, time_left) 
-                VALUES('{event.object.from_id}', '{url}', {time_left})"""
+                VALUES('{user_id_hide}', '{url}', {time_left})"""
     db_worker.execute_query(sql_query)
     vk_api.messages.send(peer_id=event.object.peer_id,
                          message=f'✅Вы успешно пишите с сайта: {url}',
@@ -54,28 +58,35 @@ def command_writen(event, url):
 
 @check_validity_url
 def command_check_url(event, url):
-    sql_query = f"SELECT * FROM UserCheating WHERE site_url = '{url}';"
+    sql_query = f"SELECT user_id, time_left FROM UserCheating WHERE site_url = '{url}';"
+    query_res = list(db_worker.execute_query(sql_query))
+
     # We check if more than a day has passed since the start of the write-off, if not, then add to the list
-    if not len([i for i in db_worker.execute_query(sql_query) if i[3] - time.time() > 0]):
+    if not len([i for i in query_res if i[1] - time.time() > 0]):
         vk_api.messages.send(peer_id=event.object.peer_id,
                              message=f'С этого сайта никто не списывает, путь свободен! 😉',
                              random_id=get_random_id(), )
         return
 
-    profile_users = list(
-        [
-            f'''
-        https://vk.com/id{i[1]} ({vk_api.users.get(user_id=(i[1]), fields="home_town")[0]["home_town"]}, 
-        {vk_api.users.get(user_id=i[1], fields="schools, city")[0]["schools"][0]["name"]})
-    '''.replace('\n', '')
-            for i in db_worker.execute_query(sql_query) if i[3] - time.time() > 0])
+    profile_users = []
+    for i in query_res:
+        if i[1] - time.time() < 0:
+            continue
+
+        city = vk_api.users.get(user_id=abs(i[0]), fields="home_town")[0]["home_town"]
+        school = vk_api.users.get(user_id=abs(i[0]), fields="schools, city")[0]["schools"][0]["name"]
+
+        if i[0] != abs(i[0]):
+            profile_users.append(f'* Профиль скрыт ({city}, {school})'.replace('\n', ''))
+            continue
+        profile_users.append(f'- https://vk.com/id{i[0]} ({city}, {school})'.replace('\n', ''))
 
     line_break = '\n'
 
     user_word = ' пользователей пишут с этого сайта, их профили:'
     if len(profile_users) == 1:
         user_word = ' пользователь пишет с этого сайта, его профиль:'
-    elif 1 < len(profile_users) < 4:
+    elif len(profile_users) < 4:
         user_word = '`е пользователей пишут с этого сайта, их профили:'
 
     message = f"""{len(profile_users)}{user_word} \n{f'{line_break}'.join(profile_users)}"""
@@ -84,33 +95,78 @@ def command_check_url(event, url):
                          random_id=get_random_id(), )
 
 
+def command_start(event):
+    keyboard = VkKeyboard()
+    keyboard.add_button('СкрытьПрофиль', VkKeyboardColor.NEGATIVE)
+    keyboard.add_button('ПоказывайПрофиль', VkKeyboardColor.POSITIVE)
+    vk_api.messages.send(peer_id=event.object.peer_id,
+                         message="""Приветствую в боте для безопасного списывания!
+                         
+                         Список комманд:
+                         1)/пишу ссылка на сайт(Указать что вы пишите с этого сайта, /пишу https://google.com/gdz.ru)
+                         2)/проверить ссылка на сайт(Проверить пишет ли кто-то сейчас с этого сайта, /проверить https://google.com/gdz.ru)
+                         3)/спрячь (Убрать ссылку на профиль из списка при проверке сайта)
+                         4)/покажи (Показывать ссылку на профиль в списке при проверке сайта)
+                         
+                         Это все команды, желаем хороших оценок! 😀
+                         """,
+                         random_id=get_random_id(),
+                         keyboard=keyboard.get_keyboard())
+
+
 def control_called_commands(event):  # Calling a specific function for a command
-    if event.object.text.split(' ')[0] == '/пишу':
+    if event.object.text.lower() == 'начать':
+        command_start(event)
+
+    elif event.object.text.split(' ')[0].lower() == '/пишу':
         url = event.object.text.split(' ')[1:]
         command_writen(event, url[0])
 
-    elif event.object.text.split(' ')[0] == '/проверить':
+    elif event.object.text.split(' ')[0].lower() == '/проверить':
         url = event.object.text.split(' ')[1:]
         command_check_url(event, url[0])
 
-    elif event.object.text.split(' ')[0] == '/спрячь':
+    elif event.object.text.split(' ')[0].lower() in ['/спрячь', 'спрячь', 'скрытьпрофиль']:
+        sql_query_select = f"""SELECT * FROM HideUserProfile WHERE user_id = {event.object.from_id}"""
+        if not list(db_worker.execute_query(sql_query_select)):
+            sql_query_insert = f"""INSERT INTO HideUserProfile (user_id) VALUES({event.object.from_id})"""
+            db_worker.execute_query(sql_query_insert)
+            keyboard = VkKeyboard()
+            keyboard.add_button('СкрытьПрофиль', VkKeyboardColor.POSITIVE)
+            keyboard.add_button('ПоказывайПрофиль', VkKeyboardColor.NEGATIVE)
+            vk_api.messages.send(peer_id=event.object.peer_id,
+                                 message='Ссылка на ваш профиль больше не будет отображаться! 🥸',
+                                 random_id=get_random_id(),
+                                 keyboard=keyboard.get_keyboard()
+                                 )
+
+    elif event.object.text.split(' ')[0].lower() in ['/покажи', 'покажи', 'показывай', 'показывайпрофиль']:
         sql_query = f"""SELECT * FROM HideUserProfile WHERE user_id = {event.object.from_id}"""
-        if not list(db_worker.execute_query(sql_query)):
-            sql_query1 = f"""INSERT INTO HideUserProfile (user_id) VALUES({event.object.from_id})"""
+        if list(db_worker.execute_query(sql_query)):
+            sql_query1 = f"""DELETE FROM HideUserProfile WHERE user_id = {event.object.from_id}"""
             db_worker.execute_query(sql_query1)
-        print(list(db_worker.execute_query(sql_query)))
+            keyboard = VkKeyboard()
+            keyboard.add_button('СкрытьПрофиль', VkKeyboardColor.NEGATIVE)
+            keyboard.add_button('ПоказывайПрофиль', VkKeyboardColor.POSITIVE)
+            vk_api.messages.send(peer_id=event.object.peer_id,
+                                 message='Ссылка на ваш профиль снова отображается! 😙',
+                                 random_id=get_random_id(),
+                                 keyboard=keyboard.get_keyboard())
 
 
 def main():
+    print('✅ Бот успешно запущен!')
     for event in longpoll.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
             try:
                 control_called_commands(event)
             except NotValidityURL:
                 vk_api.messages.send(peer_id=event.object.peer_id,
-                                     message='❌Не верный URL!',
+                                     message='❌Не верный URL!\nСсылка указывается с http://',
                                      random_id=get_random_id(), )
 
 
 if __name__ == '__main__':
     main()
+
+Added the ability to hide the profile when checking the site, VK keyboard. Minor bugs fixed
