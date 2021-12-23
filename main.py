@@ -41,7 +41,6 @@ vk_api = vk_session.get_api()
 
 db_worker = DbWorker()
 
-
 @check_validity_url
 def command_writen(event, url):
     time_left = int(time.time() + 60 * 60 * 24)
@@ -135,7 +134,7 @@ def control_called_commands(event):  # Calling a specific function for a command
             keyboard.add_button('СкрытьПрофиль', VkKeyboardColor.POSITIVE)
             keyboard.add_button('ПоказывайПрофиль', VkKeyboardColor.NEGATIVE)
             vk_api.messages.send(peer_id=event.object.peer_id,
-                                 message='Ссылка на ваш профиль больше не будет отображаться! 🥸',
+                                 message='Ссылка на ваш профиль больше не будет отображаться! 👀',
                                  random_id=get_random_id(),
                                  keyboard=keyboard.get_keyboard()
                                  )
@@ -168,5 +167,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-Added the ability to hide the profile when checking the site, VK keyboard. Minor bugs fixed
