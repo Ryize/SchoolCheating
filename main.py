@@ -32,10 +32,13 @@ class DbWorker:
         res = self.cur.execute(text_query)
         self.con.commit()
         return res
+    
+TOKEN = os.getenv('TOKEN')
+GROUP_ID = os.getenv('GROUP_ID')  # GROUP_ID must be a number
 
 
-vk_session = vk_api.VkApi(token='83908bd5550b90513c8834c2f1fd2d043b21ed8d8f309f267d483642896f6a1e70856dcdafdd1fc3c4395')
-longpoll = VkBotLongPoll(vk_session, group_id=209501325)
+vk_session = vk_api.VkApi(token=TOKEN)
+longpoll = VkBotLongPoll(vk_session, group_id=GROUP_ID)
 
 vk_api = vk_session.get_api()
 
