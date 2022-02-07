@@ -16,7 +16,7 @@ pip3 install -r requirements.txt
 
 Add your bot token and group id here in main.py
 ```
-token = os.getenv('TOKEN')
+TOKEN = os.getenv('TOKEN')
 GROUP_ID = os.getenv('GROUP_ID')
 ```
 
