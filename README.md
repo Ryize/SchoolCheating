@@ -4,23 +4,24 @@ VK bot to check who is cheating from which site, for example, you can find out i
 
 ## Deploy locally:
 
-Clone the repository
+Clone the repository and go to installed folder:
 ```
 git clone https://github.com/Ryize/schoolCheating.git
+cd schoolCheating
 ```
 
-Install requirements
+Install requirements:
 ```
 pip3 install -r requirements.txt
 ```
 
-Add your bot token and group id here in main.py
+Add your bot token and group id here in main.py:
 ```
 TOKEN = os.getenv('TOKEN')
 GROUP_ID = os.getenv('GROUP_ID')
 ```
 
-Run the bot
+Run the bot:
 ```
 python3 main.py
 ```
